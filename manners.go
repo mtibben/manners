@@ -13,27 +13,53 @@ var (
 	waitGroup       = sync.WaitGroup{}
 )
 
-func ListenAndServe(addr string, handler http.Handler) error {
-	oldListener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return err
+func BePolite(srv *http.Server) *GracefulServer {
+	return &GracefulServer{
+		delegate: srv,
 	}
-	listener := NewListener(oldListener)
-	err = Serve(listener, handler)
-	return err
 }
 
-func Serve(listener *GracefulListener, handler http.Handler) error {
+type GracefulServer struct {
+	delegate *http.Server
+}
+
+func (srv *GracefulServer) ListenAndServe() error {
+
+	addr := srv.delegate.Addr
+	if addr == "" {
+		addr = ":http"
+	}
+	l, e := net.Listen("tcp", addr)
+	if e != nil {
+		return e
+	}
+
+	gracefulListener := NewListener(l)
+
+	return srv.Serve(gracefulListener)
+}
+
+func (srv *GracefulServer) Serve(listener *GracefulListener) error {
 	listener.CloseOnShutdown()
 	go WaitForShutdown()
-	server := http.Server{Handler: handler}
-	err := server.Serve(listener)
+
+	err := srv.delegate.Serve(listener)
 	if err == nil {
 		return nil
 	} else if _, ok := err.(mannersError); ok {
 		return nil
 	}
 	return err
+}
+
+func ListenAndServe(addr string, handler http.Handler) error {
+	server := BePolite(&http.Server{Addr: addr, Handler: handler})
+	return server.ListenAndServe()
+}
+
+func Serve(listener *GracefulListener, handler http.Handler) error {
+	srv := BePolite(&http.Server{Handler: handler})
+	return srv.Serve(listener)
 }
 
 func RunRoutine(f func()) {
