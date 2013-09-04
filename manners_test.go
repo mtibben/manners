@@ -1,6 +1,7 @@
 package manners
 
 import (
+	"github.com/99designs/goodies/stringslice"
 	"net"
 	"net/http"
 	"strings"
@@ -36,7 +37,7 @@ func TestGracefulness(t *testing.T) {
 	}
 }
 
-/*// Test that the server does not accept a new request after being told to shut down.*/
+// Test that the server does not accept a new request after being told to shut down.
 func TestShutdown(t *testing.T) {
 	handler := &handlerStub{}
 	testChan = make(chan string)
@@ -46,7 +47,7 @@ func TestShutdown(t *testing.T) {
 	if err == nil {
 		t.Error("Did not get error when trying to get at closed server.")
 	} else if !strings.Contains(err.Error(), "connection refused") {
-		t.Error("Connection was not refused after server shut down")
+		t.Errorf("Connection was not refused after server shut down (error was %s)", err.Error())
 	}
 }
 
@@ -63,8 +64,8 @@ func TestShutdownWithInflightRequest(t *testing.T) {
 	_, err := http.Get("http://localhost:7200")
 	if err == nil {
 		t.Error("Did not get error when trying to get at closed server.")
-	} else if !strings.Contains(err.Error(), "connection refused") {
-		t.Error("Connection was not refused after server shut down")
+	} else if !stringslice.Contains(err.Error(), []string{"connection refused", "connection reset by peer", "transport closed before response was received"}) {
+		t.Errorf("Connection was not refused after server shut down (error was %s)", err.Error())
 	}
 }
 
